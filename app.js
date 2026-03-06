@@ -31,6 +31,10 @@ app.set('views', path.join(__dirname, 'views'));
 // ─── Static Files ────────────────────────────────────────────────────────────
 app.use('/static', express.static(path.join(__dirname, 'static')));
 
+// Respond to favicon requests immediately — before session/DB middleware —
+// so they never cause a database round-trip and can't trigger a 504.
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
 
 // ─── Body Parsing (with size limits to prevent DoS) ──────────────────────────
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
@@ -39,6 +43,12 @@ app.use(express.json({ limit: '1mb' }));
 // ─── PostgreSQL Connection Pool (Neon) ───────────────────────────────────────
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
+  // In production (Vercel + Neon) allow SSL without validating the cert chain
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  // Fail fast on cold starts instead of hanging until Vercel kills the function
+  connectionTimeoutMillis: 5000,
+  idleTimeoutMillis: 10000,
+  max: 5,
 });
 
 // ─── Session ─────────────────────────────────────────────────────────────────
@@ -49,7 +59,8 @@ app.use(session({
   store: new pgSession({
     pool: db,
     tableName: 'session',
-    createTableIfMissing: true
+    // Table is created via schema.sql — removing createTableIfMissing avoids
+    // an extra DDL round-trip to Neon on every Vercel cold start.
   }),
   secret: process.env.SESSION_SECRET || crypto.randomBytes(64).toString('hex'),
   resave: false,

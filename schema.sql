@@ -55,3 +55,15 @@ CREATE TABLE IF NOT EXISTS workshop_sign_in (
   comments   TEXT,
   created_at TIMESTAMPTZ  DEFAULT NOW()
 );
+
+-- Session table required by connect-pg-simple.
+-- Previously created automatically via createTableIfMissing; now managed here
+-- to avoid an extra DDL round-trip on every Vercel cold start.
+CREATE TABLE IF NOT EXISTS "session" (
+  "sid"    varchar      NOT NULL COLLATE "default",
+  "sess"   json         NOT NULL,
+  "expire" timestamp(6) NOT NULL,
+  CONSTRAINT "session_pkey" PRIMARY KEY ("sid") NOT DEFERRABLE INITIALLY IMMEDIATE
+) WITH (OIDS=FALSE);
+
+CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
