@@ -4,19 +4,15 @@ const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const Razorpay = require('razorpay');
-const { Pool } = require('pg');
+const Database = require('better-sqlite3');
 const path = require('path');
 const flash = require('connect-flash');
 const helmet = require('helmet');
-const { default: rateLimit, ipKeyGenerator } = require('express-rate-limit');
+const rateLimit = require('express-rate-limit');
 const { body, validationResult } = require('express-validator');
 const crypto = require('crypto');
 
 const app = express();
-
-// Trust the first proxy (Vercel / any reverse proxy) so req.ip and
-// X-Forwarded-For are resolved correctly by express-rate-limit.
-app.set('trust proxy', 1);
 
 // ─── Security Headers ────────────────────────────────────────────────────────
 // contentSecurityPolicy disabled — app uses many inline scripts and external CDNs;
@@ -30,6 +26,10 @@ app.set('views', path.join(__dirname, 'views'));
 // ─── Static Files ────────────────────────────────────────────────────────────
 app.use('/static', express.static(path.join(__dirname, 'static')));
 
+// Serve favicon explicitly to satisfy browsers requesting `/favicon.ico`
+app.get('/favicon.ico', (req, res) => {
+  res.sendFile(path.join(__dirname, 'static', 'assets', 'favicon.ico'));
+});
 
 // ─── Body Parsing (with size limits to prevent DoS) ──────────────────────────
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
@@ -76,25 +76,14 @@ function csrfProtect(req, res, next) {
 }
 app.use(csrfProtect);
 
-// ─── Razorpay Client (lazy) ───────────────────────────────────────────────────
-// Instantiated on first use so a missing key only breaks payment routes,
-// not the entire app startup.
-let _razorpayClient;
-function razorpayClient() {
-  if (!_razorpayClient) {
-    _razorpayClient = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID,
-      key_secret: process.env.RAZORPAY_KEY_SECRET
-    });
-  }
-  return _razorpayClient;
-}
-
-// ─── PostgreSQL Connection Pool (Neon) ───────────────────────────────────────
-const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+// ─── Razorpay Client ─────────────────────────────────────────────────────────
+const razorpayClient = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET
 });
+
+// ─── Single DB Connection ─────────────────────────────────────────────────────
+const db = new Database(path.join(__dirname, 'instances', 'YWS.db'));
 
 // ─── Pricing Data (server-authoritative) ─────────────────────────────────────
 const PRICING_DATA = {
@@ -134,35 +123,15 @@ function requireInstructor(req, res, next) {
 }
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
-// Custom keyGenerator to handle Vercel's proxy headers (Forwarded / X-Forwarded-For)
-// ipKeyGenerator wraps the IP so express-rate-limit handles IPv6 correctly (ERR_ERL_KEY_GEN_IPV6)
-function getClientIp(req) {
-  // RFC 7239 Forwarded header (used by Vercel)
-  const forwarded = req.headers['forwarded'];
-  if (forwarded) {
-    const match = forwarded.match(/for=["[]?([^\],";\s]+)/i);
-    if (match) {
-      const ip = match[1].replace(/^::ffff:/, '');
-      return ipKeyGenerator(ip);
-    }
-  }
-  // De-facto X-Forwarded-For header
-  const xff = req.headers['x-forwarded-for'];
-  if (xff) return ipKeyGenerator(xff.split(',')[0].trim());
-  return ipKeyGenerator(req.socket?.remoteAddress || req.ip || 'unknown');
-}
-
-const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200, keyGenerator: getClientIp });
+const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  keyGenerator: getClientIp,
   message: 'Too many login attempts, please try again later.'
 });
 const registerLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  keyGenerator: getClientIp,
   message: 'Too many registration attempts, please try again later.'
 });
 app.use(globalLimiter);
@@ -211,7 +180,7 @@ app.post('/workshop', [
   body('last_name').trim().isLength({ min: 1, max: 100 }),
   body('ph_no').matches(/^[0-9]{10}$/),
   body('comments').optional().trim().isLength({ max: 500 }),
-], async (req, res) => {
+], (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     req.flash('error', 'Invalid input. Please check your details.');
@@ -219,10 +188,10 @@ app.post('/workshop', [
   }
   const { first_name, last_name, ph_no, comments = '' } = req.body;
   try {
-    await db.query(
-      'INSERT INTO workshop_sign_in (first_name, last_name, ph_no, comments) VALUES ($1, $2, $3, $4)',
-      [first_name, last_name, ph_no, comments.slice(0, 500)]
-    );
+    db.prepare(`
+      INSERT INTO workshop_sign_in (first_name, last_name, Ph_no, Comments)
+      VALUES (?, ?, ?, ?)
+    `).run(first_name, last_name, ph_no, comments.slice(0, 500));
     req.flash('success', 'Registration successful!');
   } catch (err) {
     console.error('Workshop registration error:', err);
@@ -314,7 +283,7 @@ app.post('/create_order', requireUser, async (req, res) => {
   const amountInPaise = serverAmount * 100;
 
   try {
-    const order = await razorpayClient().orders.create({
+    const order = await razorpayClient.orders.create({
       amount: amountInPaise,
       currency: 'INR',
       receipt: `order_${Date.now()}_${req.session.user_id}`,
@@ -389,17 +358,18 @@ app.post('/register', registerLimiter, [
   }
 
   try {
-    const existing = (await db.query('SELECT ph_no FROM users WHERE ph_no = $1', [phoneNo])).rows[0];
+    const existing = db.prepare('SELECT Ph_no FROM users WHERE Ph_no = ?').get(phoneNo);
     if (existing) {
       req.flash('error', 'Phone number already registered. Please use a different phone number.');
       return res.redirect('/');
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const result = await db.query(
-      'INSERT INTO users (name, lastname, ph_no, gender, password) VALUES ($1, $2, $3, $4, $5) RETURNING uid',
-      [firstName, secondName, phoneNo, Gender, hashedPassword]
-    );
-    const newUserId = result.rows[0].uid;
+    const result = db.prepare(`
+      INSERT INTO users (name, lastname, Ph_no, gender, password)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(firstName, secondName, phoneNo, Gender, hashedPassword);
+
+    const newUserId = result.lastInsertRowid;
     req.session.regenerate((err) => {
       if (err) {
         req.flash('danger', 'Registration succeeded but login failed. Please log in.');
@@ -425,7 +395,7 @@ app.get('/login', (req, res) => {
   res.render('login');
 });
 
-app.post('/login', loginLimiter, async (req, res) => {
+app.post('/login', loginLimiter, (req, res) => {
   const { phoneNo, password } = req.body;
 
   if (!phoneNo || !password) {
@@ -459,63 +429,55 @@ app.post('/login', loginLimiter, async (req, res) => {
     return;
   }
 
-  try {
-    // User login
-    const user = (await db.query(
-      'SELECT uid, name, lastname, ph_no, password FROM users WHERE ph_no = $1',
-      [phoneNo]
-    )).rows[0];
+  // User login
+  const user = db.prepare(
+    'SELECT UID, name, lastname, Ph_no, password FROM users WHERE Ph_no = ?'
+  ).get(phoneNo);
 
-    if (user && bcrypt.compareSync(password, user.password)) {
-      clearFailedAttempts(phoneNo);
-      req.session.regenerate((err) => {
-        if (err) {
-          req.flash('danger', 'Login error. Please try again.');
-          return res.redirect('/login');
-        }
-        req.session.user_type = 'user';
-        req.session.user_id = user.uid;
-        req.session.user_name = user.name;
-        req.session.user_lastname = user.lastname;
-        req.session.user_phone = user.ph_no;
-        req.session.csrfToken = crypto.randomBytes(32).toString('hex');
-        req.session.save(() => res.redirect('/success'));
-      });
-      return;
-    }
-
-    // Instructor login
-    const instructor = (await db.query(
-      'SELECT tid, name, lastname, ph_no, password FROM instructors WHERE ph_no = $1',
-      [phoneNo]
-    )).rows[0];
-
-    if (instructor && bcrypt.compareSync(password, instructor.password)) {
-      clearFailedAttempts(phoneNo);
-      req.session.regenerate((err) => {
-        if (err) {
-          req.flash('danger', 'Login error. Please try again.');
-          return res.redirect('/login');
-        }
-        req.session.user_type = 'instructor';
-        req.session.instructor_id = instructor.tid;
-        req.session.user_name = instructor.name;
-        req.session.user_lastname = instructor.lastname;
-        req.session.user_phone = instructor.ph_no;
-        req.session.csrfToken = crypto.randomBytes(32).toString('hex');
-        req.session.save(() => res.redirect('/instructor_dashboard'));
-      });
-      return;
-    }
-
-    recordFailedAttempt(phoneNo);
-    req.flash('danger', 'Invalid phone number or password.');
-    return res.redirect('/login');
-  } catch (err) {
-    console.error('Login error:', err);
-    req.flash('danger', 'An error occurred. Please try again.');
-    return res.redirect('/login');
+  if (user && bcrypt.compareSync(password, user.password)) {
+    clearFailedAttempts(phoneNo);
+    req.session.regenerate((err) => {
+      if (err) {
+        req.flash('danger', 'Login error. Please try again.');
+        return res.redirect('/login');
+      }
+      req.session.user_type = 'user';
+      req.session.user_id = user.UID;
+      req.session.user_name = user.name;
+      req.session.user_lastname = user.lastname;
+      req.session.user_phone = user.Ph_no;
+      req.session.csrfToken = crypto.randomBytes(32).toString('hex');
+      req.session.save(() => res.redirect('/success'));
+    });
+    return;
   }
+
+  // Instructor login
+  const instructor = db.prepare(
+    'SELECT TID, name, lastname, Ph_no, password FROM instructors WHERE Ph_no = ?'
+  ).get(phoneNo);
+
+  if (instructor && bcrypt.compareSync(password, instructor.password)) {
+    clearFailedAttempts(phoneNo);
+    req.session.regenerate((err) => {
+      if (err) {
+        req.flash('danger', 'Login error. Please try again.');
+        return res.redirect('/login');
+      }
+      req.session.user_type = 'instructor';
+      req.session.instructor_id = instructor.TID;
+      req.session.user_name = instructor.name;
+      req.session.user_lastname = instructor.lastname;
+      req.session.user_phone = instructor.Ph_no;
+      req.session.csrfToken = crypto.randomBytes(32).toString('hex');
+      req.session.save(() => res.redirect('/instructor_dashboard'));
+    });
+    return;
+  }
+
+  recordFailedAttempt(phoneNo);
+  req.flash('danger', 'Invalid phone number or password.');
+  return res.redirect('/login');
 });
 
 // Apply (Instructor Application)
@@ -553,17 +515,17 @@ app.post('/apply', [
   const fullAddress = `${address}, ${address2 || ''}, ${city}, ${state}, ${postal}`;
 
   try {
-    const existing = (await db.query('SELECT ph_no FROM instructors WHERE ph_no = $1', [phone])).rows[0];
+    const existing = db.prepare('SELECT Ph_no FROM instructors WHERE Ph_no = ?').get(phone);
     if (existing) {
       req.flash('error', 'Phone number already registered. Please use a different number.');
       return res.redirect('/apply');
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await db.query(
-      'INSERT INTO instructors (name, lastname, ph_no, dob, address, reference, password) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-      [fname, lname, phone, dob, fullAddress, hear, hashedPassword]
-    );
+    db.prepare(`
+      INSERT INTO instructors (name, lastname, Ph_no, DOB, Address, reference, password)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(fname, lname, phone, dob, fullAddress, hear, hashedPassword);
 
     req.flash('success', 'Application submitted successfully!');
     return res.render('teachercart');
@@ -575,43 +537,43 @@ app.post('/apply', [
 });
 
 // Instructor Dashboard
-app.get('/instructor_dashboard', requireInstructor, async (req, res) => {
+app.get('/instructor_dashboard', requireInstructor, (req, res) => {
   try {
     const tid = req.session.instructor_id;
 
-    const { rows: instructor_courses } = await db.query(`
-      SELECT i.name, i.lastname, c.course_name
+    const instructor_courses = db.prepare(`
+      SELECT i.name, i.lastname, c.Course_name
       FROM instructors i
-      JOIN instructor_teaching it ON i.tid = it.tid
-      JOIN course c ON it.cid = c.cid
-      WHERE i.tid = $1
-    `, [tid]);
+      JOIN instructor_teaching it ON i.TID = it.TID
+      JOIN course c ON it.CID = c.CID
+      WHERE i.TID = ?
+    `).all(tid);
 
     const instructor_name = instructor_courses.length > 0
       ? `${instructor_courses[0].name} ${instructor_courses[0].lastname}`
       : (req.session.user_name ? `${req.session.user_name} ${req.session.user_lastname || ''}`.trim() : '');
 
-    const { rows: students_data } = await db.query(`
-      SELECT u.name, u.lastname, c.course_name
+    const students_data = db.prepare(`
+      SELECT u.name, u.lastname, c.Course_name
       FROM users u
-      JOIN applicants a ON u.uid = a.uid
-      JOIN course c ON a.cid = c.cid
-      JOIN instructor_teaching it ON c.cid = it.cid
-      WHERE it.tid = $1
-    `, [tid]);
+      JOIN applicants a ON u.UID = a.UID
+      JOIN course c ON a.CID = c.CID
+      JOIN instructor_teaching it ON c.CID = it.CID
+      WHERE it.TID = ?
+    `).all(tid);
 
     const students_by_course = {};
     for (const row of students_data) {
-      if (!students_by_course[row.course_name]) {
-        students_by_course[row.course_name] = [];
+      if (!students_by_course[row.Course_name]) {
+        students_by_course[row.Course_name] = [];
       }
-      students_by_course[row.course_name].push(`${row.name} ${row.lastname}`);
+      students_by_course[row.Course_name].push(`${row.name} ${row.lastname}`);
     }
 
-    const { rows: learning_rows } = await db.query(
-      'SELECT course_name FROM instructor_learning WHERE tid = $1', [tid]
-    );
-    const learning_courses = learning_rows.map(r => r.course_name);
+    const learning_rows = db.prepare(
+      'SELECT Course_name FROM instructor_learning WHERE TID = ?'
+    ).all(tid);
+    const learning_courses = learning_rows.map(r => r.Course_name);
 
     return res.render('teach_dashboard', {
       instructor_name,
@@ -647,19 +609,19 @@ app.get('/success', (req, res) => {
 
 // ─── Admin ───────────────────────────────────────────────────────────────────
 
-app.get('/admin', requireAdmin, async (req, res) => {
+app.get('/admin', requireAdmin, (req, res) => {
   try {
-    const total_enrollments = Number((await db.query('SELECT COUNT(DISTINCT uid) AS count FROM applicants')).rows[0].count);
-    const total_instructors = Number((await db.query('SELECT COUNT(*) AS count FROM instructors')).rows[0].count);
-    const total_courses = Number((await db.query('SELECT COUNT(*) AS count FROM course')).rows[0].count);
-    const income_row = (await db.query('SELECT SUM(course.price) AS sum FROM course INNER JOIN applicants ON course.cid = applicants.cid')).rows[0];
-    const total_income = income_row.sum || 0;
-    const { rows: new_students } = await db.query(`
+    const total_enrollments = db.prepare('SELECT COUNT(DISTINCT UID) FROM applicants').get()['COUNT(DISTINCT UID)'];
+    const total_instructors = db.prepare('SELECT COUNT(*) FROM instructors').get()['COUNT(*)'];
+    const total_courses = db.prepare('SELECT COUNT(*) FROM course').get()['COUNT(*)'];
+    const income_row = db.prepare('SELECT SUM(course.Price) FROM course INNER JOIN applicants ON course.CID = applicants.CID').get();
+    const total_income = income_row['SUM(course.Price)'] || 0;
+    const new_students = db.prepare(`
       SELECT DISTINCT u.name, u.lastname
       FROM applicants a
-      JOIN users u ON a.uid = u.uid
+      JOIN users u ON a.UID = u.UID
       LIMIT 10
-    `);
+    `).all();
 
     return res.render('admin', {
       total_enrollments,
@@ -677,17 +639,17 @@ app.get('/admin', requireAdmin, async (req, res) => {
 
 // ─── Enrollments ─────────────────────────────────────────────────────────────
 
-app.get('/edit_enrollments', requireAdmin, async (req, res) => {
+app.get('/edit_enrollments', requireAdmin, (req, res) => {
   try {
-    const { rows: enrollments } = await db.query(`
-      SELECT users.uid, users.name, users.lastname,
-             string_agg(course.course_name, ', ') AS course_names,
-             SUM(course.price) AS total_fees, MAX(applicants.appid) AS appid
+    const enrollments = db.prepare(`
+      SELECT users.UID, users.name, users.lastname,
+             GROUP_CONCAT(course.Course_name, ', ') AS Course_names,
+             SUM(course.Price) AS Total_Fees, applicants.APPID
       FROM applicants
-      JOIN users ON applicants.uid = users.uid
-      JOIN course ON applicants.cid = course.cid
-      GROUP BY users.uid, users.name, users.lastname
-    `);
+      JOIN users ON applicants.UID = users.UID
+      JOIN course ON applicants.CID = course.CID
+      GROUP BY users.UID
+    `).all();
     return res.render('enrollments', { enrollments });
   } catch (err) {
     console.error('Edit enrollments error:', err);
@@ -696,16 +658,16 @@ app.get('/edit_enrollments', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/delete_enrollment/:appid', requireAdmin, async (req, res) => {
+app.post('/delete_enrollment/:appid', requireAdmin, (req, res) => {
   const appid = parseInt(req.params.appid);
   if (!Number.isFinite(appid) || appid <= 0) {
     return res.status(400).send('Invalid ID');
   }
   try {
-    const user = (await db.query('SELECT uid FROM applicants WHERE appid = $1', [appid])).rows[0];
+    const user = db.prepare('SELECT UID FROM applicants WHERE APPID = ?').get(appid);
     if (user) {
-      await db.query('DELETE FROM applicants WHERE appid = $1', [appid]);
-      await db.query('DELETE FROM users WHERE uid = $1', [user.uid]);
+      db.prepare('DELETE FROM applicants WHERE APPID = ?').run(appid);
+      db.prepare('DELETE FROM users WHERE UID = ?').run(user.UID);
       req.flash('success', 'Enrollment and user deleted successfully!');
     } else {
       req.flash('error', 'User not found or already deleted.');
@@ -720,41 +682,41 @@ app.post('/delete_enrollment/:appid', requireAdmin, async (req, res) => {
 
 // ─── Instructors ─────────────────────────────────────────────────────────────
 
-app.get('/edit_instructors', requireAdmin, async (req, res) => {
+app.get('/edit_instructors', requireAdmin, (req, res) => {
   try {
-    const { rows } = await db.query(`
-      SELECT i.tid, i.name, i.lastname, i.ph_no, i.address,
-             c.cid, c.course_name, il.course_name AS learning_course
+    const rows = db.prepare(`
+      SELECT i.TID, i.name, i.lastname, i.Ph_no, i.Address,
+             c.CID, c.Course_name, il.Course_name AS learning_course
       FROM instructors i
-      LEFT JOIN instructor_teaching it ON i.tid = it.tid
-      LEFT JOIN course c ON it.cid = c.cid
-      LEFT JOIN instructor_learning il ON i.tid = il.tid
-    `);
+      LEFT JOIN instructor_teaching it ON i.TID = it.TID
+      LEFT JOIN course c ON it.CID = c.CID
+      LEFT JOIN instructor_learning il ON i.TID = il.TID
+    `).all();
 
     const instructorsMap = {};
     for (const row of rows) {
-      if (!instructorsMap[row.tid]) {
-        instructorsMap[row.tid] = {
-          tid: row.tid,
+      if (!instructorsMap[row.TID]) {
+        instructorsMap[row.TID] = {
+          tid: row.TID,
           name: row.name,
           lastname: row.lastname,
-          phone: row.ph_no,
-          address: row.address,
+          phone: row.Ph_no,
+          address: row.Address,
           courses: [],
           learning_courses: []
         };
       }
-      if (row.cid) {
-        if (!instructorsMap[row.tid].courses.find(c => c.cid === row.cid)) {
-          instructorsMap[row.tid].courses.push({ cid: row.cid, name: row.course_name });
+      if (row.CID) {
+        if (!instructorsMap[row.TID].courses.find(c => c.cid === row.CID)) {
+          instructorsMap[row.TID].courses.push({ cid: row.CID, name: row.Course_name });
         }
       }
-      if (row.learning_course && !instructorsMap[row.tid].learning_courses.includes(row.learning_course)) {
-        instructorsMap[row.tid].learning_courses.push(row.learning_course);
+      if (row.learning_course && !instructorsMap[row.TID].learning_courses.includes(row.learning_course)) {
+        instructorsMap[row.TID].learning_courses.push(row.learning_course);
       }
     }
     const instructors = Object.values(instructorsMap);
-    const { rows: all_courses } = await db.query('SELECT cid AS "CID", course_name AS "Course_name" FROM course');
+    const all_courses = db.prepare('SELECT CID, Course_name FROM course').all();
 
     return res.render('instructors', { instructors, all_courses });
   } catch (err) {
@@ -764,13 +726,13 @@ app.get('/edit_instructors', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/add_instructor_course/:tid', requireAdmin, async (req, res) => {
+app.post('/add_instructor_course/:tid', requireAdmin, (req, res) => {
   const tid = parseInt(req.params.tid);
   if (!Number.isFinite(tid) || tid <= 0) return res.status(400).send('Invalid ID');
   const course_id = parseInt(req.body.course);
   if (!Number.isFinite(course_id) || course_id <= 0) return res.status(400).send('Invalid course ID');
   try {
-    await db.query('INSERT INTO instructor_teaching (tid, cid) VALUES ($1, $2)', [tid, course_id]);
+    db.prepare('INSERT INTO instructor_teaching (TID, CID) VALUES (?, ?)').run(tid, course_id);
     req.flash('success', 'Course added successfully!');
   } catch (err) {
     console.error('Add instructor course error:', err);
@@ -779,14 +741,14 @@ app.post('/add_instructor_course/:tid', requireAdmin, async (req, res) => {
   return res.redirect('/edit_instructors');
 });
 
-app.post('/remove_instructor_course/:tid/:cid', requireAdmin, async (req, res) => {
+app.post('/remove_instructor_course/:tid/:cid', requireAdmin, (req, res) => {
   const tid = parseInt(req.params.tid);
   const cid = parseInt(req.params.cid);
   if (!Number.isFinite(tid) || tid <= 0 || !Number.isFinite(cid) || cid <= 0) {
     return res.status(400).send('Invalid ID');
   }
   try {
-    await db.query('DELETE FROM instructor_teaching WHERE tid = $1 AND cid = $2', [tid, cid]);
+    db.prepare('DELETE FROM instructor_teaching WHERE TID = ? AND CID = ?').run(tid, cid);
     req.flash('success', 'Course removed successfully!');
   } catch (err) {
     console.error('Remove instructor course error:', err);
@@ -795,11 +757,11 @@ app.post('/remove_instructor_course/:tid/:cid', requireAdmin, async (req, res) =
   return res.redirect('/edit_instructors');
 });
 
-app.post('/delete_instructor_enrollment/:tid', requireAdmin, async (req, res) => {
+app.post('/delete_instructor_enrollment/:tid', requireAdmin, (req, res) => {
   const tid = parseInt(req.params.tid);
   if (!Number.isFinite(tid) || tid <= 0) return res.status(400).send('Invalid ID');
   try {
-    await db.query('DELETE FROM instructors WHERE tid = $1', [tid]);
+    db.prepare('DELETE FROM instructors WHERE TID = ?').run(tid);
     req.flash('success', 'Instructor and their data deleted successfully!');
   } catch (err) {
     console.error('Delete instructor error:', err);
@@ -810,9 +772,9 @@ app.post('/delete_instructor_enrollment/:tid', requireAdmin, async (req, res) =>
 
 // ─── Courses ─────────────────────────────────────────────────────────────────
 
-app.get('/edit_course', requireAdmin, async (req, res) => {
+app.get('/edit_course', requireAdmin, (req, res) => {
   try {
-    const { rows: courses } = await db.query('SELECT cid AS "CID", course_name AS "Course_name", price AS "Price", from_date, to_date FROM course');
+    const courses = db.prepare('SELECT CID, Course_name, Price, from_date, to_date FROM course').all();
     return res.render('course', { courses });
   } catch (err) {
     console.error('Edit course error:', err);
@@ -824,7 +786,7 @@ app.get('/edit_course', requireAdmin, async (req, res) => {
 app.post('/edit_course', requireAdmin, [
   body('price').optional().isFloat({ min: 0 }),
   body('course_name').optional().trim().isLength({ min: 1, max: 200 }),
-], async (req, res) => {
+], (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     req.flash('error', 'Invalid input. Please check your details.');
@@ -835,14 +797,13 @@ app.post('/edit_course', requireAdmin, [
       const course_id = parseInt(req.body.course_id);
       if (!Number.isFinite(course_id) || course_id <= 0) return res.status(400).send('Invalid ID');
       const { from_date, to_date } = req.body;
-      await db.query('UPDATE course SET from_date = $1, to_date = $2 WHERE cid = $3', [from_date, to_date, course_id]);
+      db.prepare('UPDATE course SET from_date = ?, to_date = ? WHERE CID = ?')
+        .run(from_date, to_date, course_id);
       req.flash('success', 'Course dates updated successfully!');
     } else {
       const { course_name, price, from_date, to_date } = req.body;
-      await db.query(
-        'INSERT INTO course (course_name, price, from_date, to_date) VALUES ($1, $2, $3, $4)',
-        [course_name, price, from_date, to_date]
-      );
+      db.prepare('INSERT INTO course (Course_name, Price, from_date, to_date) VALUES (?, ?, ?, ?)')
+        .run(course_name, price, from_date, to_date);
       req.flash('success', 'Course added successfully!');
     }
     return res.redirect('/edit_course');
@@ -853,11 +814,11 @@ app.post('/edit_course', requireAdmin, [
   }
 });
 
-app.post('/delete_course/:course_id', requireAdmin, async (req, res) => {
+app.post('/delete_course/:course_id', requireAdmin, (req, res) => {
   const course_id = parseInt(req.params.course_id);
   if (!Number.isFinite(course_id) || course_id <= 0) return res.status(400).send('Invalid ID');
   try {
-    await db.query('DELETE FROM course WHERE cid = $1', [course_id]);
+    db.prepare('DELETE FROM course WHERE CID = ?').run(course_id);
     req.flash('success', 'Course deleted successfully!');
   } catch (err) {
     console.error('Delete course error:', err);
@@ -868,7 +829,7 @@ app.post('/delete_course/:course_id', requireAdmin, async (req, res) => {
 
 // ─── Process Payment ─────────────────────────────────────────────────────────
 
-app.post('/process_payment', requireUser, async (req, res) => {
+app.post('/process_payment', requireUser, (req, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -907,10 +868,10 @@ app.post('/process_payment', requireUser, async (req, res) => {
 
   try {
     for (const course_name of courses) {
-      const { rows: [course] } = await db.query('SELECT cid FROM course WHERE course_name = $1', [course_name]);
+      const course = db.prepare('SELECT CID FROM course WHERE Course_name = ?').get(course_name);
       if (course) {
         try {
-          await db.query('INSERT INTO applicants (uid, cid) VALUES ($1, $2)', [user_id, course.cid]);
+          db.prepare('INSERT INTO applicants (UID, CID) VALUES (?, ?)').run(user_id, course.CID);
         } catch {
           // Ignore duplicate entry errors
         }
@@ -936,10 +897,6 @@ app.use((err, req, res, next) => {
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`Indramala Yoga server running at http://localhost:${PORT}`);
-  });
-}
-
-module.exports = app;
+app.listen(PORT, () => {
+  console.log(`Indramala Yoga server running at http://localhost:${PORT}`);
+});

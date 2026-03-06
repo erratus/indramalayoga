@@ -1,0 +1,1 @@
+i want to host this site on vercel, give me step by step approach of how i can host it starting from what files to keep in the github repository to what will be the root to 
