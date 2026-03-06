@@ -42,7 +42,7 @@ app.use(express.json({ limit: '1mb' }));
 
 // ─── PostgreSQL Connection Pool (Neon) ───────────────────────────────────────
 const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.DATABASE_URL_UNPOOLED,
   // In production (Vercel + Neon) allow SSL without validating the cert chain
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   // Fail fast on cold starts instead of hanging until Vercel kills the function
