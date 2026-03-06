@@ -138,15 +138,31 @@ function requireInstructor(req, res, next) {
 }
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
-const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
+// Custom keyGenerator to handle Vercel's proxy headers (Forwarded / X-Forwarded-For)
+function getClientIp(req) {
+  // RFC 7239 Forwarded header (used by Vercel)
+  const forwarded = req.headers['forwarded'];
+  if (forwarded) {
+    const match = forwarded.match(/for=["[]?([^\],";\s]+)/i);
+    if (match) return match[1].replace(/^::ffff:/, '');
+  }
+  // De-facto X-Forwarded-For header
+  const xff = req.headers['x-forwarded-for'];
+  if (xff) return xff.split(',')[0].trim();
+  return req.socket?.remoteAddress || req.ip || 'unknown';
+}
+
+const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200, keyGenerator: getClientIp });
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
+  keyGenerator: getClientIp,
   message: 'Too many login attempts, please try again later.'
 });
 const registerLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
+  keyGenerator: getClientIp,
   message: 'Too many registration attempts, please try again later.'
 });
 app.use(globalLimiter);
