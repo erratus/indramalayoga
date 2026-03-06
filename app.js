@@ -14,6 +14,10 @@ const crypto = require('crypto');
 
 const app = express();
 
+// Trust the first proxy (Vercel / any reverse proxy) so req.ip and
+// X-Forwarded-For are resolved correctly by express-rate-limit.
+app.set('trust proxy', 1);
+
 // ─── Security Headers ────────────────────────────────────────────────────────
 // contentSecurityPolicy disabled — app uses many inline scripts and external CDNs;
 // configure a proper CSP policy before enabling in production.
