@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const session = require('express-session');
+const pgSession = require('connect-pg-simple')(session);
 const bcrypt = require('bcryptjs');
 const Razorpay = require('razorpay');
 const { Pool } = require('pg');
@@ -35,11 +36,22 @@ app.use('/static', express.static(path.join(__dirname, 'static')));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.json({ limit: '1mb' }));
 
+// ─── PostgreSQL Connection Pool (Neon) ───────────────────────────────────────
+const db = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
 // ─── Session ─────────────────────────────────────────────────────────────────
 if (!process.env.SESSION_SECRET) {
   console.warn('WARNING: SESSION_SECRET not set. Sessions will not survive restart.');
 }
 app.use(session({
+  store: new pgSession({
+    pool: db,
+    tableName: 'session',
+    createTableIfMissing: true
+  }),
   secret: process.env.SESSION_SECRET || crypto.randomBytes(64).toString('hex'),
   resave: false,
   saveUninitialized: false,
@@ -89,12 +101,6 @@ function razorpayClient() {
   }
   return _razorpayClient;
 }
-
-// ─── PostgreSQL Connection Pool (Neon) ───────────────────────────────────────
-const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
 
 // ─── Pricing Data (server-authoritative) ─────────────────────────────────────
 const PRICING_DATA = {
