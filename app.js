@@ -8,7 +8,7 @@ const { Pool } = require('pg');
 const path = require('path');
 const flash = require('connect-flash');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+const { default: rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { body, validationResult } = require('express-validator');
 const crypto = require('crypto');
 
@@ -139,17 +139,21 @@ function requireInstructor(req, res, next) {
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
 // Custom keyGenerator to handle Vercel's proxy headers (Forwarded / X-Forwarded-For)
+// ipKeyGenerator wraps the IP so express-rate-limit handles IPv6 correctly (ERR_ERL_KEY_GEN_IPV6)
 function getClientIp(req) {
   // RFC 7239 Forwarded header (used by Vercel)
   const forwarded = req.headers['forwarded'];
   if (forwarded) {
     const match = forwarded.match(/for=["[]?([^\],";\s]+)/i);
-    if (match) return match[1].replace(/^::ffff:/, '');
+    if (match) {
+      const ip = match[1].replace(/^::ffff:/, '');
+      return ipKeyGenerator(ip);
+    }
   }
   // De-facto X-Forwarded-For header
   const xff = req.headers['x-forwarded-for'];
-  if (xff) return xff.split(',')[0].trim();
-  return req.socket?.remoteAddress || req.ip || 'unknown';
+  if (xff) return ipKeyGenerator(xff.split(',')[0].trim());
+  return ipKeyGenerator(req.socket?.remoteAddress || req.ip || 'unknown');
 }
 
 const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200, keyGenerator: getClientIp });
