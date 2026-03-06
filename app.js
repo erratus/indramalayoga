@@ -30,10 +30,6 @@ app.set('views', path.join(__dirname, 'views'));
 // ─── Static Files ────────────────────────────────────────────────────────────
 app.use('/static', express.static(path.join(__dirname, 'static')));
 
-// Serve favicon explicitly to satisfy browsers requesting `/favicon.ico`
-app.get('/favicon.ico', (req, res) => {
-  res.sendFile(path.join(__dirname, 'static', 'assets', 'favicon.ico'));
-});
 
 // ─── Body Parsing (with size limits to prevent DoS) ──────────────────────────
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
