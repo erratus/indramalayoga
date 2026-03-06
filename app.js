@@ -76,11 +76,19 @@ function csrfProtect(req, res, next) {
 }
 app.use(csrfProtect);
 
-// ─── Razorpay Client ─────────────────────────────────────────────────────────
-const razorpayClient = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET
-});
+// ─── Razorpay Client (lazy) ───────────────────────────────────────────────────
+// Instantiated on first use so a missing key only breaks payment routes,
+// not the entire app startup.
+let _razorpayClient;
+function razorpayClient() {
+  if (!_razorpayClient) {
+    _razorpayClient = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET
+    });
+  }
+  return _razorpayClient;
+}
 
 // ─── PostgreSQL Connection Pool (Neon) ───────────────────────────────────────
 const db = new Pool({
@@ -286,7 +294,7 @@ app.post('/create_order', requireUser, async (req, res) => {
   const amountInPaise = serverAmount * 100;
 
   try {
-    const order = await razorpayClient.orders.create({
+    const order = await razorpayClient().orders.create({
       amount: amountInPaise,
       currency: 'INR',
       receipt: `order_${Date.now()}_${req.session.user_id}`,
