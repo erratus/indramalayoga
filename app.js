@@ -39,7 +39,6 @@ app.use(express.json({ limit: '1mb' }));
 // ─── PostgreSQL Connection Pool (Neon) ───────────────────────────────────────
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
 });
 
 // ─── Session ─────────────────────────────────────────────────────────────────
