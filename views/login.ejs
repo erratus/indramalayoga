@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/styles/login.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="icon" type="image/x-icon" href="/static/assets/favicon.ico">
+    <title>Login</title>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-11548243331"></script>
+    <script> window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'AW-11548243331'); </script>
+</head>
+<body>
+    <% if (flash_messages && flash_messages.danger && flash_messages.danger.length > 0) { %>
+        <div class="flashes">
+            <% flash_messages.danger.forEach(msg => { %>
+                <div class="flash danger"><%= msg %></div>
+            <% }) %>
+        </div>
+    <% } %>
+
+    <div class="container">
+        <img src="/static/assets/yogapose3.png" alt="Image 1" class="side-image left-image">
+        <div class="screen">
+            <div class="screen__content">
+                <form class="login" action="/login" method="post">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <div class="login__field">
+                        <i class="fa fa-phone"></i>
+                        <input type="tel" inputmode="numeric" pattern="[0-9]*" class="login__input" placeholder="Phone No." name="phoneNo" required>
+                    </div>
+                    <div class="login__field">
+                        <i class="fa fa-lock" aria-hidden="true"></i>
+                        <input type="password" class="login__input" placeholder="Password" name="password" required>
+                    </div>
+                    <button class="button login__submit">
+                        <span class="button__text">Log In Now</span>
+                        <i class="button__icon fas fa-chevron-right"></i>
+                    </button>
+                </form>
+            </div>
+            <div class="screen__background">
+                <span class="screen__background__shape screen__background__shape4"></span>
+                <span class="screen__background__shape screen__background__shape3"></span>        
+                <span class="screen__background__shape screen__background__shape2"></span>
+                <span class="screen__background__shape screen__background__shape1"></span>
+            </div>        
+        </div>
+        <img src="/static/assets/yogapose4.png" alt="Image 2" class="side-image right-image">
+    </div>
+</body>
+</html>

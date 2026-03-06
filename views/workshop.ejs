@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="/static/assets/favicon.ico">
+    <link rel="stylesheet" href="/static/styles/workshop.css">
+    <title>Workshop Signup</title>
+    <style>
+        .back-button {
+            z-index: 1;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 12px 24px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            text-decoration: none;
+            font-family: 'Montserrat', sans-serif;
+        }
+        .back-button:hover {
+            background-color: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+    </style>  
+</head>
+<body>
+    <a href="/" class="back-button">Back to Home</a>
+
+    <% if (messages && messages.success && messages.success.length > 0) { %>
+        <div class="flashes">
+            <% messages.success.forEach(msg => { %>
+                <div class="flash success" style="background:#d4edda;color:#155724;padding:10px;margin:10px;border-radius:4px;"><%= msg %></div>
+            <% }) %>
+        </div>
+    <% } %>
+
+    <div class="container">
+        <div class="workshop-details">
+            <h1>Workshop Title</h1>
+            <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Ad voluptates expedita corrupti molestias veniam cupiditate alias distinctio corporis veritatis ea. Adipisci culpa ipsam ut nisi dolor! Culpa molestiae atque delectus?</p>
+            <p><strong>Timings:</strong> 10:00 AM - 2:00 PM, 25th November 2024</p>
+        </div>
+
+        <div class="signup-form">
+            <h2>Sign Up for the Workshop</h2>
+            <form action="/workshop" method="POST">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <label for="name">First Name:</label>
+                <input type="text" id="first_name" name="first_name" required>
+
+                <label for="last name">Last name:</label>
+                <input type="text" id="last_name" name="last_name" required>
+
+                <label for="phone">Phone Number:</label>
+                <input type="tel" id="ph_no" name="ph_no" required>
+
+                <label for="comments">Comments (Optional):</label>
+                <textarea id="comments" name="comments" rows="4"></textarea>
+
+                <button type="submit">Register</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

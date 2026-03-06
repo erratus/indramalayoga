@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="csrf-token" content="<%= csrfToken %>">
+        <link rel="stylesheet" href="/static/styles/addtocart.css">
+        <script src="https://kit.fontawesome.com/92d70a2fd8.js" crossorigin="anonymous"></script>
+        <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+        <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+        <link rel="icon" type="image/x-icon" href="/static/assets/favicon.ico">
+        <title>Your Cart</title>
+        <script async src="https://www.googletagmanager.com/gtag/js?id=AW-11548243331"></script> 
+        <script> 
+            window.dataLayer = window.dataLayer || []; 
+            function gtag(){dataLayer.push(arguments);} 
+            gtag('js', new Date()); 
+            gtag('config', 'AW-11548243331'); 
+        </script>
+    </head>
+    <body>
+        <div class="header">
+            <div class="logo">
+                <img src="/static/assets/website_icon1.webp" alt="">
+            </div>
+            <div class="header1">
+                <h1 class="head-txt">Yoga Packages</h1>
+            </div>
+            <div class="cart">
+                <i class="fa-solid fa-cart-shopping"></i>
+                <p id="count">0</p>
+            </div>
+        </div>
+        
+        <div class="toggle-container">
+            <label for="payment-manner">Payment Manner:</label>
+            <select id="payment-manner" onchange="updatePrices()">
+                <option value="" disabled selected>Select Payment Manner</option>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="half-yearly">Half Yearly</option>
+                <option value="yearly">Yearly</option>
+            </select>
+
+            <label for="class-frequency" style="margin-left: 15px;">Class Frequency:</label>
+            <select id="class-frequency" onchange="updatePrices()">
+                <option value="" disabled selected>Select Class Frequency</option>
+                <option value="regular">Regular</option>
+                <option value="alternate">Alternate</option>
+            </select>
+        </div>
+        
+        <div class="container">
+            <div id="root">
+                <div class="box" id="product-0" data-type="general-yoga">
+                    <div class="img-box">
+                        <img class="images" src="/static/assets/meditation.webp" alt="General Yoga">
+                    </div>
+                    <div class="description-box" id="description-0"></div>
+                    <div class="bottom">
+                        <p>General Yoga</p>
+                        <h2 id="price-0">Rs 2500.00</h2>
+                        <button onclick="addtocart(0)">Add to cart</button>
+                    </div>
+                </div>
+
+                <div class="box" id="product-1" data-type="advanced-yoga">
+                    <div class="img-box">
+                        <img class="images" src="/static/assets/advancedyoga.webp" alt="Advanced Yoga">
+                    </div>
+                    <div class="description-box" id="description-1"></div>
+                    <div class="bottom">
+                        <p>Advanced Yoga</p>
+                        <h2 id="price-1">Rs 3500.00</h2>
+                        <button onclick="addtocart(1)">Add to cart</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="head"><p>My Cart</p></div>
+                <div id="cartItem">Your cart is empty</div>
+                <div class="foot">
+                    <h3>Total</h3>
+                    <h2 id="total">Rs 0.00</h2>
+                    <button id="pay-button" onclick="submitPayment()">Submit</button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const product = [
+                {
+                    id: 0,
+                    image: "/static/assets/meditation.webp",
+                    title: 'General Yoga',
+                    dataType: 'general-yoga',
+                    description: "1. Minor muscle exercise<br>2. Major muscle exercise<br>3. Sun/Moon Salutations<br>4. General Asanas<br>5. Pranayama<br>6. Bandha<br>7. Mudras<br>8. Shanti Path"
+                },
+                {
+                    id: 1,
+                    image: '/static/assets/advancedyoga.webp',
+                    title: 'Advanced Yoga',
+                    dataType: 'advanced-yoga',
+                    description: '1. Minor muscle exercise<br>2. Major muscle exercise<br>3. Sun/Moon Salutations<br>4. Advanced Asanas<br>5. Hatha Yoga<br>6. Power Yoga<br>7. Vinyasa<br>8. Tratak<br>9. Bandha<br>10. Mudras <br>11. Deep Breathing<br>12. Yog Nidra<br>13. Meditation<br>14. Shata Karma<br>15. Shanti Path'
+                }
+            ];
+
+            const categories = [...new Set(product.map((item) => item))];
+            let cart = [];
+
+            const pricingData = {
+                "general-yoga": {
+                    "regular":   { "monthly": 2500, "quarterly": 6000, "half-yearly": 10000, "yearly": 17000 },
+                    "alternate": { "monthly": 1500, "quarterly": 4000, "half-yearly": 7500,  "yearly": 11500 }
+                },
+                "advanced-yoga": {
+                    "regular":   { "monthly": 3500, "quarterly": 9000, "half-yearly": 15000, "yearly": 21000 },
+                    "alternate": { "monthly": 2500, "quarterly": 6000, "half-yearly": 10000, "yearly": 15000 }
+                }
+            };
+
+            function updatePrices() {
+                const paymentManner = document.getElementById('payment-manner').value;
+                const classFrequency = document.getElementById('class-frequency').value;
+                if (!paymentManner || !classFrequency) return;
+                document.querySelectorAll('.box').forEach((product) => {
+                    const productType = product.getAttribute('data-type');
+                    const priceElement = product.querySelector('h2');
+                    if (pricingData[productType] && pricingData[productType][classFrequency]) {
+                        const price = pricingData[productType][classFrequency][paymentManner];
+                        priceElement.textContent = `Rs ${price}.00`;
+                    }
+                });
+            }
+
+            function addtocart(index) {
+                const product = categories[index];
+                const paymentManner = document.getElementById('payment-manner').value;
+                const classFrequency = document.getElementById('class-frequency').value;
+                if (!paymentManner || !classFrequency) {
+                    alert("Please select Payment Manner and Class Frequency before adding to cart.");
+                    return;
+                }
+                const price = pricingData[product.dataType][classFrequency][paymentManner];
+                let existingItem = cart.find(item => item.id === product.id);
+                if (existingItem) {
+                    existingItem.quantity++;
+                } else {
+                    cart.push({ ...product, quantity: 1, paymentManner, classFrequency, price });
+                }
+                displaycart();
+            }
+
+            function displaycart() {
+                let total = 0;
+                document.getElementById("count").innerHTML = cart.length;
+                const cartContainer = document.getElementById('cartItem');
+                cartContainer.innerHTML = '';
+                if (cart.length === 0) {
+                    cartContainer.textContent = 'Your cart is empty';
+                    document.getElementById("total").textContent = "Rs 0.00";
+                } else {
+                    cart.forEach((item) => {
+                        total += item.price * item.quantity;
+                        const div = document.createElement('div');
+                        div.className = 'cart-item';
+
+                        const rowImg = document.createElement('div');
+                        rowImg.className = 'row-img';
+                        const img = document.createElement('img');
+                        img.className = 'rowimg';
+                        img.src = item.image;
+                        rowImg.appendChild(img);
+
+                        const p = document.createElement('p');
+                        p.style.fontSize = '12px';
+                        p.textContent = `${item.title} (${item.paymentManner}, ${item.classFrequency}) x${item.quantity}`;
+
+                        const h2 = document.createElement('h2');
+                        h2.style.fontSize = '15px';
+                        h2.textContent = `Rs ${item.price * item.quantity}.00`;
+
+                        const btnPlus = document.createElement('button');
+                        btnPlus.className = 'qty-btn';
+                        btnPlus.textContent = '+';
+                        btnPlus.onclick = () => updateQuantity(item.id, 1);
+
+                        const btnMinus = document.createElement('button');
+                        btnMinus.className = 'qty-btn';
+                        btnMinus.textContent = '−';
+                        btnMinus.onclick = () => updateQuantity(item.id, -1);
+
+                        const trash = document.createElement('i');
+                        trash.className = 'fa-solid fa-trash';
+                        trash.onclick = () => delElement(item.id);
+
+                        div.appendChild(rowImg);
+                        div.appendChild(p);
+                        div.appendChild(h2);
+                        div.appendChild(btnPlus);
+                        div.appendChild(btnMinus);
+                        div.appendChild(trash);
+                        cartContainer.appendChild(div);
+                    });
+                    document.getElementById("total").textContent = `Rs ${total}.00`;
+                }
+            }
+
+            function updateQuantity(productId, change) {
+                let itemIndex = cart.findIndex(item => item.id === productId);
+                if (itemIndex !== -1) {
+                    if (cart[itemIndex].quantity + change > 0) {
+                        cart[itemIndex].quantity += change;
+                    } else {
+                        cart.splice(itemIndex, 1);
+                    }
+                    displaycart();
+                }
+            }
+
+            function delElement(productId) {
+                cart = cart.filter(item => item.id !== productId);
+                displaycart();
+            }
+
+            function submitPayment() {
+                if (cart.length === 0) {
+                    alert("Your cart is empty!");
+                    return;
+                }
+
+                const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+                // Send full cart details so the server can calculate the amount
+                const courseDetails = cart.map(item => ({
+                    dataType: item.dataType,
+                    paymentManner: item.paymentManner,
+                    classFrequency: item.classFrequency,
+                    quantity: item.quantity,
+                    title: item.title
+                }));
+
+                fetch('/create_order', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    body: JSON.stringify({ courses: courseDetails }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = `/pay`;
+                    } else {
+                        alert("Order creation failed. Please try again.");
+                    }
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                    alert("An error occurred while creating the order.");
+                });
+            }
+
+            window.onload = function () {
+                document.getElementById('payment-manner').value = 'monthly';
+                document.getElementById('class-frequency').value = 'regular';
+                updatePrices();
+            };
+        </script>
+    </body>
+</html>

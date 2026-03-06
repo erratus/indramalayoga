@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/styles/appl.css">
+    <link rel="icon" type="image/x-icon" href="/static/assets/favicon.ico">
+    <title>Apply</title>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-11548243331"></script>
+    <script> window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'AW-11548243331'); </script>
+</head>
+<body>
+
+    <% if (messages) { %>
+        <% if (messages.error && messages.error.length > 0) { %>
+            <div class="flashes">
+                <% messages.error.forEach(msg => { %>
+                    <div class="flash error" style="background:#f8d7da;color:#721c24;padding:10px;margin:10px;border-radius:4px;"><%= msg %></div>
+                <% }) %>
+            </div>
+        <% } %>
+        <% if (messages.success && messages.success.length > 0) { %>
+            <div class="flashes">
+                <% messages.success.forEach(msg => { %>
+                    <div class="flash success" style="background:#d4edda;color:#155724;padding:10px;margin:10px;border-radius:4px;"><%= msg %></div>
+                <% }) %>
+            </div>
+        <% } %>
+    <% } %>
+
+    <section class="main-body">
+        <div class="heading">
+            <h1>Join Our Team</h1>
+            <p>We're excited to have you apply! Please fill out the form below to buy our courses.</p>
+            <hr>
+        </div>
+        <div class="know-courses">
+            <button type="button" id="courses-btn" onclick="window.location.href='/knowabtcourses'" class="hero-button">Explore Our Couses</button>
+        </div>
+        
+        <form action="/apply" method="post">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <div class="app-form">
+                <label for="fname">Full Name</label><br>
+                <div class="candidate-name">
+                    <input type="text" name="fname" id="fname" placeholder="First Name" required>
+                    <input type="text" name="lname" id="lname" placeholder="Last Name" required>
+                </div>
+
+                <label for="dob-month">Birth Date</label><br>
+                <div class="dob">
+                    <select name="dob-date" id="dob-date" required>
+                        <option value="" disabled selected>Day</option>
+                    </select>
+                    <select name="dob-month" id="dob-month" required>
+                        <option value="" disabled selected>Month</option>
+                    </select>
+                    <select name="dob-year" id="dob-year" required>
+                        <option value="" disabled selected>Year</option>
+                    </select>
+                </div>
+
+                <label for="password">Password</label><br>
+                <div class="password">
+                    <input type="password" name="password" id="password" placeholder="Create a strong password" required>
+                </div>
+                <br>
+                <label for="address">Current Address</label><br>
+                <div class="address-1">
+                    <input class="strt-1" type="text" name="address" id="address" placeholder="Street Address" required>
+                    <input class="strt-2" type="text" name="address2" id="address2" placeholder="Street Address Line 2">
+                </div>
+                <div class="address-2">
+                    <input class="city" type="text" name="city" id="city" placeholder="City" required>
+                    <input class="state" type="text" name="state" id="state" placeholder="State / Province" required>
+                </div>
+                <div class="address-3">
+                    <input class="postal" type="text" name="postal" id="postal" placeholder="Postal / Zip Code" required>
+                </div>
+
+                <label for="phoneNo">Contact Information</label>
+                <div class="info">
+                    <br>
+                    <input type="email" name="email" id="email" placeholder="Email: myname@example.com" required><br>
+                    <label for="phone"></label>
+                    <input type="tel" name="phone" id="phone" placeholder="Phone: +91 00000 00000" required><br>
+                </div>
+            </div>
+
+            <div class="job-applying">
+                <div class="pos-applying">
+                    <div class="pos-applied-hear">
+                        <br>
+                        <label for="hear">How did you hear about us?</label><br>
+                        <select name="hear" id="hear" required>
+                            <option value="" disabled selected>Please Select</option>
+                            <option value="Event">Event</option>
+                            <option value="Social Media">Social Media</option>
+                            <option value="IRL">Friend/colleague/family</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="submit-form">
+                    <input type="submit" value="Submit" name="btn" id="btn">
+                </div>
+            </div>
+        </form>
+    </section>
+</body>
+<script>
+let dateOptions = "<option value='' disabled selected>Day</option>";
+let monthOptions = "<option value='' disabled selected>Month</option>";
+let yearOptions = "<option value='' disabled selected>Year</option>";
+
+for (let d = 1; d <= 31; d++) { dateOptions += `<option value="${d}">${d}</option>`; }
+for (let m = 1; m <= 12; m++) { monthOptions += `<option value="${m}">${m}</option>`; }
+for (let y = 1947; y <= 2023; y++) { yearOptions += `<option value="${y}">${y}</option>`; }
+
+document.getElementById('dob-date').innerHTML = dateOptions;
+document.getElementById('dob-month').innerHTML = monthOptions;
+document.getElementById('dob-year').innerHTML = yearOptions;
+</script>
+</html>

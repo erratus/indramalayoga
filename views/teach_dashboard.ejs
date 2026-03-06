@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instructor Dashboard</title>
+    <link rel="stylesheet" href="/static/styles/teacher_dashboard.css">
+    <link rel="icon" type="image/x-icon" href="/static/assets/favicon.ico">
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            <img src="/static/assets/website_icon.webp" alt="Logo">
+        </div>
+        <div class="header1">
+            <p class="head-txt">TEACHER'S DASHBOARD</p>
+        </div>
+        <button class="sign-out-btn" onclick="location.href='/logout'">Sign Out</button>
+    </div>
+
+    <div class="instructor-card">
+        <h2>Instructor: <%= instructor_name %></h2>
+
+        <div class="instructor-details">
+            <strong>Courses Taught:</strong>
+            <ul>
+                <% Object.entries(students_by_course).forEach(([course, students]) => { %>
+                    <li>
+                        <strong><%= course %></strong>
+                        <ul>
+                            <% students.forEach(student => { %>
+                                <li><%= student %></li>
+                            <% }) %>
+                        </ul>
+                    </li>
+                <% }) %>
+            </ul>
+        </div>
+
+        <div class="instructor-details">
+            <strong>Courses Learning:</strong>
+            <ul>
+                <% learning_courses.forEach(course => { %>
+                    <li><%= course %></li>
+                <% }) %>
+            </ul>
+            <form action="/enroll" method="GET">
+                <button type="submit" class="button-21">Buy Courses</button>
+            </form>            
+        </div>
+    </div>
+</body>
+</html>

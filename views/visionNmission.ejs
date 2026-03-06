@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="/static/assets/favicon.ico">
+    <title>Vision and Mission</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Poppins', sans-serif; background-color: #c3e6cb; color: #333; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        .container { max-width: 1200px; width: 100%; background-color: rgba(255,255,255,0.9); border-radius: 15px; padding: 30px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); backdrop-filter: blur(10px); }
+        .section { display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; }
+        .section img { width: 40%; height: auto; border-radius: 15px; box-shadow: 0 6px 12px rgba(0,0,0,0.15); transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .section img:hover { transform: scale(1.05); box-shadow: 0 8px 16px rgba(0,0,0,0.2); }
+        .section div { width: 55%; padding: 20px; }
+        h1 { font-size: 2.5rem; margin-bottom: 20px; color: #2d5f7a; text-transform: uppercase; letter-spacing: 2px; text-align: center; }
+        p { font-size: 1.2rem; line-height: 1.8; color: #5f7f6e; text-align: justify; }
+        .back-button { position: fixed; top: 20px; left: 20px; padding: 12px 24px; background-color: #4CAF50; color: white; border: none; border-radius: 25px; font-size: 16px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.3s ease; text-decoration: none; font-family: 'Montserrat', sans-serif; z-index: 1000; }
+        .back-button:hover { background-color: #45a049; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        @media (max-width: 768px) { body { padding: 10px; } .container { padding: 20px; } .section { flex-direction: column; text-align: center; margin-bottom: 20px; } .section div { width: 100%; padding: 10px 0; } .section img { width: 70%; margin: 10px auto; } h1 { font-size: 2rem; } p { font-size: 1rem; line-height: 1.5; } .back-button { top: 10px; left: 10px; padding: 8px 16px; font-size: 14px; } }
+        @media (max-width: 480px) { h1 { font-size: 1.8rem; } p { font-size: 0.9rem; } .section img { width: 90%; } .back-button { padding: 6px 12px; font-size: 12px; } }
+    </style>
+</head>
+<body>
+    <a href="/" class="back-button">Back to Home</a>
+    <div class="container">
+        <div class="section vision">
+            <div>
+                <h1>Our Vision</h1>
+                <p>At Indramala Yoga Sansthan, our vision is to create a world where individuals are empowered to cultivate holistic well-being, inner peace, and personal transformation through the practice of yoga. We envision a community where everyone has access to the tools and support they need to thrive physically, mentally, and spiritually.</p>
+            </div>
+            <img src="/static/assets/grp.webp" alt="Vision Image">
+        </div>
+        <div class="section mission">
+            <div>
+                <h1>Our Mission</h1>
+                <p>Our mission at Indramala Yoga Sansthan is to provide a nurturing and inclusive space where individuals of all backgrounds and abilities can explore the transformative power of yoga.</p>
+            </div>
+            <img src="/static/assets/mainbg.webp" alt="Mission Image">
+        </div>
+    </div>
+</body>
+</html>

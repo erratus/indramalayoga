@@ -1,0 +1,26 @@
+{
+  "name": "indramala-yoga",
+  "version": "1.0.0",
+  "description": "Indramala Yoga Sansthan web application (Node.js port)",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^9.4.3",
+    "connect-flash": "^0.1.1",
+    "dotenv": "^17.3.1",
+    "ejs": "^3.1.9",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.3.0",
+    "express-session": "^1.17.3",
+    "express-validator": "^7.3.1",
+    "helmet": "^8.1.0",
+    "razorpay": "^2.9.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

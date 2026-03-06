@@ -1,0 +1,202 @@
+@import url('https://fonts.googleapis.com/css?family=Raleway:400,700');
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;    
+    font-family: Raleway, sans-serif;
+}
+
+html, body {
+    overflow: auto;
+    height: 100%;
+}
+
+body {
+    background: linear-gradient(135deg, #fff4cc, #ffc95c);
+    min-height: 100vh;
+    padding: 15px;
+}
+
+section {
+    margin: 20px auto;
+    padding: 25px;
+    background: linear-gradient(135deg, #ff7f0e, #d35400);
+    border-radius: 15px;
+    box-shadow: 0 8px 25px rgba(140, 86, 75, 0.3);
+    max-width: 550px;
+    width: 95%;
+}
+
+::placeholder {
+    color: rgba(255, 255, 255, 0.8);
+    opacity: 1;
+}
+
+.heading {
+    text-align: center;
+    color: #fff;
+    border-radius: 10px;
+}
+
+.heading h1 {
+    font-size: 2.2rem;
+    margin-bottom: 8px;
+    font-weight: 700;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.heading p {
+    margin-bottom: 15px;
+    font-size: 1rem;
+    opacity: 0.9;
+}
+
+hr {
+    border: none;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.2);
+    margin-bottom: 25px;
+}
+
+.candidate-name,
+.dob,
+.address-1,
+.address-2,
+.address-3,
+.info,
+.job-applying {
+    margin-bottom: 15px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+/* Special styling for Full Name and Birth Date sections */
+.candidate-name,
+.dob {
+    background: rgba(255, 201, 92, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+label {
+    display: block;
+    margin-bottom: 6px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 1rem;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Special label styling for Full Name and Birth Date */
+.candidate-name label,
+.dob label {
+    color: #fff4cc;
+    font-size: 1.1rem;
+}
+
+.candidate-name input,
+.password input,
+.dob select,
+.address-1 input,
+.address-2 input,
+.address-3 input,
+.info input,
+.job-applying select,
+.start-date input {
+    width: 100%;
+    height: 38px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 8px 12px;
+    font-weight: 500;
+    color: #fff;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+}
+
+/* Special input/select styling for Full Name and Birth Date */
+.candidate-name input,
+.dob select {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 201, 92, 0.5);
+}
+
+.candidate-name input:focus,
+.dob select:focus,
+.address-1 input:focus,
+.address-2 input:focus,
+.address-3 input:focus,
+.info input:focus,
+.job-applying select:focus,
+.start-date input:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* Special focus styling for Full Name and Birth Date */
+.candidate-name input:focus,
+.dob select:focus {
+    border-color: #ffc95c;
+    background: rgba(255, 201, 92, 0.2);
+}
+
+/* Dropdown specific styling */
+select option {
+    background: #fff;
+    color: #333;
+    padding: 8px;
+}
+
+.submit-form {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.submit-form input {
+    width: 120px;
+    height: 40px;
+    background: #ffc95c;
+    color: #333;
+    border-radius: 20px;
+    border: none;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.submit-form input:hover {
+    background: #f7b636;
+    transform: translateY(-2px);
+}
+
+.know-courses {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+#courses-btn {
+    background-color: #f58a63; /* Your orange button color */
+    color: #fff;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#courses-btn:hover {
+    background-color: #e6734a; /* Slightly darker orange for hover effect */
+}
+.heading {
+    text-align: center;
+    color: #fff;
+    border-radius: 10px;
+}
